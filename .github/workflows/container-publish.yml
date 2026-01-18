@@ -1,0 +1,40 @@
+name: Build and Publish Docker Image
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker image
+        run: |
+          REPO_NAME=${{ github.repository }}
+          # Convert repository name to lowercase
+          REPO_NAME=${REPO_NAME,,}
+          VERSION_TAG=ghcr.io/${REPO_NAME}:${{ github.ref_name }}
+          LATEST_TAG=ghcr.io/${REPO_NAME}:latest
+          
+          # Build and push for multiple architectures with both tags
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --push \
+            -t $VERSION_TAG \
+            -t $LATEST_TAG .
