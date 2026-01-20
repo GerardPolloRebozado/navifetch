@@ -110,6 +110,7 @@ type ExternalItem struct {
 	Confidence    float64 `json:"confidence,omitempty"`
 	OriginalQuery string  `json:"originalQuery,omitempty"`
 	Duration      int64   `json:"duration,omitempty"` // Seconds
+	Size          int64   `json:"size,omitempty"`
 }
 
 // WrapExternalSearch returns a Subsonic-compatible with the results in the "song" list.
@@ -123,6 +124,7 @@ func WrapExternalSearch(items []ExternalItem) map[string]any {
 			"album":                 item.Album,
 			"coverArt":              "itunes-cover-" + url.QueryEscape(item.CoverArtURL),
 			"duration":              item.Duration,
+			"size":                  (item.Duration * 160000) / 8,
 			"isDir":                 false,
 			"isVideo":               false,
 			"suffix":                "mp3",
