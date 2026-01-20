@@ -34,11 +34,11 @@ type iTunesResult struct {
 	TrackTimeMillis  int64  `json:"trackTimeMillis"`
 }
 
-// ITunesSearch searches for songs using the iTunes Search API.
+// ITunesSearch searches for songs to display metadata.
 func ITunesSearch(ctx context.Context, query string) ([]iTunesResult, error) {
 
 	endpoint := fmt.Sprintf(
-		"https://itunes.apple.com/search?term=%s&media=music&entity=song&limit=%d",
+		"https://itunes.apple.com/search?term=%s&media=music&entity=song",
 		url.QueryEscape(query),
 	)
 
