@@ -17,6 +17,20 @@ type Config struct {
 	YTDLPPath        string
 }
 
+func CORSMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Access-Control-Expose-Headers", "X-Content-Duration, X-Total-Count, X-Nd-Authorization")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func LoadConfig() (*Config, error) {
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
@@ -100,6 +114,7 @@ func main() {
 
 	// Middleware
 	handler := LoggingMiddleware(mux)
+	handler = CORSMiddleware(handler)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
