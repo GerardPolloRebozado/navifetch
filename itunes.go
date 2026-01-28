@@ -103,8 +103,11 @@ type ExternalItem struct {
 	Source        string  `json:"source"`
 	RecordingID   string  `json:"recordingId,omitempty"`
 	Title         string  `json:"title,omitempty"`
+	ArtistID      int64   `json:"artistId,omitempty"`
 	Artist        string  `json:"artist,omitempty"`
 	Album         string  `json:"album,omitempty"`
+	AlbumID       int64   `json:"albumId,omitempty"`
+	Genre         string  `json:"genre,omitempty"`
 	ReleaseID     string  `json:"releaseId,omitempty"`
 	CoverArtURL   string  `json:"coverArtUrl,omitempty"`
 	Confidence    float64 `json:"confidence,omitempty"`
@@ -122,7 +125,10 @@ func WrapExternalSearch(items []ExternalItem) map[string]any {
 			"id":                    "itunes-" + item.RecordingID,
 			"title":                 item.Title,
 			"artist":                item.Artist,
+			"artistId":              item.ArtistID,
 			"album":                 item.Album,
+			"albumId":               item.AlbumID,
+			"genre":                 item.Genre,
 			"coverArt":              "itunes-cover-" + url.QueryEscape(item.CoverArtURL),
 			"duration":              item.Duration,
 			"size":                  (item.Duration * 160000) / 8,
