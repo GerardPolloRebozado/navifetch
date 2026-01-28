@@ -162,7 +162,6 @@ func ProxyPlaylistOrQueue(cfg *Config, rp http.Handler, permanent bool) http.Han
 			json.NewEncoder(w).Encode(resp)
 			return
 		}
-
 		rp.ServeHTTP(w, r)
 	}
 }

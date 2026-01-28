@@ -118,6 +118,7 @@ func WrapExternalSearch(items []ExternalItem) map[string]any {
 	songs := make([]map[string]any, len(items))
 	for i, item := range items {
 		songs[i] = map[string]any{
+			"parent":                item.Album,
 			"id":                    "itunes-" + item.RecordingID,
 			"title":                 item.Title,
 			"artist":                item.Artist,
@@ -131,6 +132,7 @@ func WrapExternalSearch(items []ExternalItem) map[string]any {
 			"contentType":           "audio/mpeg",
 			"transcodedSuffix":      "mp3",
 			"transcodedContentType": "audio/mpeg",
+			"created":               time.Now(),
 		}
 	}
 
