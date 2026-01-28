@@ -148,23 +148,11 @@ func WrapExternalSearch(items []ExternalItem) map[string]any {
 			"comment":               item.Source,
 			"sortName":              item.Title,
 			"musicBrainzId":         "",
-			"isrc":                  []string{},
-			"genres": []string{
-				item.Genre,
-			},
-			"artists": []string{
-				item.Artist,
-			},
-			"displayArtist": item.Artist,
-			"albumArtists": []string{
-				item.Artist,
-			},
-			"displayAlbumArtists": item.Artist,
-			"contributors":        []string{},
-			"displayComposer":     item.Artist,
-			"moods":               []string{},
-			"replayGain":          0,
-			"explicitStatus":      "clean",
+			"displayArtist":         item.Artist,
+			"displayAlbumArtists":   item.Artist,
+			"displayComposer":       item.Artist,
+			"replayGain":            0,
+			"explicitStatus":        "clean",
 		}
 	}
 
