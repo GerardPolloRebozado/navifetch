@@ -138,7 +138,33 @@ func WrapExternalSearch(items []ExternalItem) map[string]any {
 			"contentType":           "audio/mpeg",
 			"transcodedSuffix":      "mp3",
 			"transcodedContentType": "audio/mpeg",
+			"type":                  "music",
+			"mediaType":             "song",
 			"created":               time.Now(),
+			"channelCount":          2,
+			"bitDepth":              16,
+			"samplingRate":          44100,
+			"bpm":                   1,
+			"comment":               item.Source,
+			"sortName":              item.Title,
+			"musicBrainzId":         "",
+			"isrc":                  []string{},
+			"genres": []string{
+				item.Genre,
+			},
+			"artists": []string{
+				item.Artist,
+			},
+			"displayArtist": item.Artist,
+			"albumArtists": []string{
+				item.Artist,
+			},
+			"displayAlbumArtists": item.Artist,
+			"contributors":        []string{},
+			"displayComposer":     item.Artist,
+			"moods":               []string{},
+			"replayGain":          0,
+			"explicitStatus":      "clean",
 		}
 	}
 
