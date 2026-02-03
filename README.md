@@ -39,6 +39,7 @@ services:
     environment:
       - NAVIDROME_BASE=http://navidrome:4533
     restart: unless-stopped
+
 ```
 
 ### Configuration

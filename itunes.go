@@ -195,6 +195,22 @@ func ProxyCoverArt(rp http.Handler) http.HandlerFunc {
 			w.WriteHeader(status)
 			_, _ = w.Write(body)
 			return
+		} else if strings.HasPrefix(id, "itunes-") {
+			res, err := ITunesLookup(r.Context(), strings.TrimPrefix(id, "itunes-"))
+			if err != nil || len(res) == 0 {
+				log.Printf("Error fetching cover art: %v", err)
+				http.Error(w, "Failed to fetch cover", http.StatusBadGateway)
+			}
+			body, status, contentType, err := HTTPGet(r.Context(), GetHighResArtwork(res[0].ArtworkUrl100), nil)
+			if err != nil {
+				log.Printf("Error fetching cover art: %v", err)
+				http.Error(w, "Failed to fetch cover", http.StatusBadGateway)
+			}
+			w.Header().Set("Content-Type", contentType)
+			w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
+			w.WriteHeader(status)
+			_, _ = w.Write(body)
+			return
 		}
 
 		// Forward to Navidrome
