@@ -1,21 +1,20 @@
-package main
+package service
 
 import (
 	"io"
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/GerardPolloRebozado/navitube/src/config"
 )
 
-func StartCleanupCron(cfg *Config) {
+func StartCleanupCron(cfg *config.Config) {
 	ticker := time.NewTicker(24 * time.Hour)
 
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				cleanupJob(cfg)
-			}
+		for range ticker.C {
+			CleanupJob(cfg)
 		}
 	}()
 }
@@ -34,10 +33,11 @@ func IsFolderEmpty(name string) (bool, error) {
 	return false, err
 }
 
-func cleanFile(path string) {
+func CleanFile(path string) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		slog.Error("Error reading dir: " + path)
+		return
 	}
 	for _, file := range files {
 		currFilePath := path + "/" + file.Name()
@@ -47,12 +47,13 @@ func cleanFile(path string) {
 				os.Remove(currFilePath)
 				continue
 			}
-			cleanFile(currFilePath)
+			CleanFile(currFilePath)
 			continue
 		}
 		meta, err := file.Info()
 		if err != nil {
 			slog.Error("Error reading file info: " + currFilePath)
+			continue
 		}
 		if time.Now().Unix()-meta.ModTime().Unix() > 86400 {
 			os.Remove(currFilePath)
@@ -60,10 +61,10 @@ func cleanFile(path string) {
 	}
 }
 
-func cleanupJob(cfg *Config) {
+func CleanupJob(cfg *config.Config) {
 	slog.Info("Running cleanup job")
 
-	cleanFile(cfg.MusicLibraryPath + "/" + "cached")
+	CleanFile(cfg.MusicLibraryPath + "/" + "cached")
 
 	slog.Info("Cleanup job finished.")
 }
