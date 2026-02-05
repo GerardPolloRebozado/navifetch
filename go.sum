@@ -1,2 +1,4 @@
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
+github.com/torabit/itunes v0.0.0-20230702053550-80ae037e7f4f h1:xMCVryBmnnZP14qap4kDHrE7c7YmvhVDaDMCMMT7Pdw=
+github.com/torabit/itunes v0.0.0-20230702053550-80ae037e7f4f/go.mod h1:Hm4MVfhzwIYmI8+6Az10Gh8VEEM+LTw2TfP8QZJ/G34=

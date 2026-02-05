@@ -1,10 +1,16 @@
-package main
+package client
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
+	"time"
+
+	"github.com/GerardPolloRebozado/navitube/src/util"
 )
 
 func NewReverseProxy(base string) (*httputil.ReverseProxy, error) {
@@ -17,7 +23,6 @@ func NewReverseProxy(base string) (*httputil.ReverseProxy, error) {
 	origDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
 		origDirector(req)
-		// req.URL.Path is already updated by origDirector (singleJoiningSlash)
 		req.Header.Set("X-Forwarded-Host", req.Host)
 		if req.TLS != nil {
 			req.Header.Set("X-Forwarded-Proto", "https")
@@ -27,7 +32,6 @@ func NewReverseProxy(base string) (*httputil.ReverseProxy, error) {
 	}
 
 	proxy.ModifyResponse = func(resp *http.Response) error {
-		// Drop CORS headers from upstream to avoid duplicates with our middleware
 		resp.Header.Del("Access-Control-Allow-Origin")
 		resp.Header.Del("Access-Control-Allow-Methods")
 		resp.Header.Del("Access-Control-Allow-Headers")
@@ -41,4 +45,23 @@ func NewReverseProxy(base string) (*httputil.ReverseProxy, error) {
 	}
 
 	return proxy, nil
+}
+
+func TriggerNavidromeScan(base string, params url.Values) {
+	scanURL := fmt.Sprintf("%s/rest/startScan.view?%s", strings.TrimRight(base, "/"), params.Encode())
+
+	log.Println("Triggering Navidrome library scan...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, status, _, err := util.HTTPGet(ctx, scanURL, nil)
+	if err != nil {
+		log.Printf("Failed to trigger scan: %v", err)
+		return
+	}
+	if status != 200 {
+		log.Printf("Navidrome scan trigger returned status: %d", status)
+	} else {
+		log.Println("Navidrome scan triggered successfully.")
+	}
 }
