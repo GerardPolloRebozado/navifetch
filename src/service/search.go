@@ -2,124 +2,49 @@ package service
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net/url"
-	"time"
+	"encoding/json"
 
-	"github.com/GerardPolloRebozado/navitube/src/client"
-	"github.com/GerardPolloRebozado/navitube/src/model"
-	"github.com/torabit/itunes"
+	"github.com/GerardPolloRebozado/navifetch/src/metadata"
+	"github.com/GerardPolloRebozado/navifetch/src/model"
 )
 
-func ItunesSongToSubsonicSong(rec itunes.Result) model.SubsonicSong {
-	return model.SubsonicSong{
-		Parent:                rec.CollectionName,
-		ID:                    fmt.Sprintf("itunes-%d", rec.TrackId),
-		Title:                 rec.TrackName + " iTunes",
-		Artist:                rec.ArtistName,
-		ArtistID:              fmt.Sprintf("itunes-%d", rec.ArtistId),
-		Album:                 rec.CollectionName,
-		AlbumID:               fmt.Sprintf("itunes-%d", rec.CollectionId),
-		Genre:                 rec.PrimaryGenreName,
-		CoverArt:              "itunes-cover-" + url.QueryEscape(rec.ArtworkUrl100),
-		Duration:              rec.TrackTimeMillis / 1000,
-		Size:                  ((rec.TrackTimeMillis / 1000) * 160000) / 8,
-		IsDir:                 false,
-		IsVideo:               false,
-		Suffix:                "mp3",
-		ContentType:           "audio/mpeg",
-		TranscodedSuffix:      "mp3",
-		TranscodedContentType: "audio/mpeg",
-		Type:                  "music",
-		MediaType:             "song",
-		Created:               time.Now(),
-		ChannelCount:          2,
-		BitDepth:              16,
-		SamplingRate:          44100,
-		Bpm:                   1,
-		Comment:               "itunes",
-		SortName:              rec.TrackName,
-		MusicBrainzId:         "",
-		DisplayArtist:         rec.ArtistName,
-		DisplayAlbumArtists:   rec.ArtistName,
-		DisplayComposer:       rec.ArtistName,
-		ExplicitStatus:        "clean",
+type SearchService struct {
+	upstream NavidromeClient
+	metadata metadata.Provider
+}
+
+func NewSearchService(upstream NavidromeClient, metadata metadata.Provider) *SearchService {
+	return &SearchService{
+		upstream: upstream,
+		metadata: metadata,
 	}
 }
 
-func ItunesAlbumToSubsonicAlbum(rec itunes.Result) model.Album {
-	return model.Album{
-		ID:        fmt.Sprintf("itunes-%d", rec.CollectionId),
-		Parent:    fmt.Sprintf("itunes-%d", rec.ArtistId),
-		Album:     rec.CollectionName,
-		Title:     rec.CollectionName,
-		Name:      rec.CollectionName,
-		IsDir:     true,
-		CoverArt:  "itunes-cover-" + url.QueryEscape(rec.ArtworkUrl100),
-		SongCount: int64(rec.TrackCount),
-		Created:   time.Now(),
-		ArtistID:  fmt.Sprintf("itunes-%d", rec.ArtistId),
-		Artist:    rec.ArtistName,
-		Genre:     rec.PrimaryGenreName,
-	}
-}
-
-func PerformSmartSearch(ctx context.Context, query string) ([]itunes.Result, error) {
-	itunesClient := client.GetItunesClient()
-	res, err := itunesClient.Search(ctx,
-		itunes.Term(query),
-		itunes.Media(itunes.MediaMusic))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return res.Results, nil
-}
-
-func PerformAlbumSearch(ctx context.Context, query string) ([]itunes.Result, error) {
-	itunesClient := client.GetItunesClient()
-	res, err := itunesClient.Search(ctx,
-		itunes.Term(query),
-		itunes.Media(itunes.MediaMusic),
-		itunes.Entity(itunes.EntityAlbum))
-
-	if err != nil {
-		return nil, err
-	}
-
-	return res.Results, nil
-}
-
-func PerformAlbumSongSearch(ctx context.Context, id int64) ([]itunes.Result, error) {
-	itunesClient := client.GetItunesClient()
-	res, err := itunesClient.Lookup(ctx, itunes.ID(id),
-		itunes.Entity(itunes.EntitySong),
-		itunes.Media(itunes.MediaMusic))
-	if err != nil {
-		return nil, err
-	}
-	filtered := res.Results[:0]
-	for _, r := range res.Results {
-		if r.WrapperType == "track" {
-			filtered = append(filtered, r)
+func (s *SearchService) SmartSearch(ctx context.Context, query string, path string, rawQuery string) ([]byte, string, error) {
+	body, contentType, err := s.upstream.SearchNavidrome(ctx, path, rawQuery)
+	if err == nil && body != nil {
+		bytes, err := json.Marshal(body)
+		if err != nil {
+			return nil, "", err
 		}
+		return bytes, contentType, nil
 	}
-	res.Results = filtered
 
-	if len(res.Results) == 0 {
-		return nil, errors.New("no results found")
+	songs, err := s.metadata.SearchSongs(ctx, query)
+	if err != nil {
+		return nil, "", err
 	}
-	return res.Results, nil
+
+	resp := WrapExternalSearch(songs)
+	jsonBody, err := json.Marshal(resp)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return jsonBody, "application/json; charset=utf-8", nil
 }
 
-func WrapExternalSearch(results []itunes.Result) map[string]any {
-	songs := make([]model.SubsonicSong, len(results))
-	for i, rec := range results {
-		songs[i] = ItunesSongToSubsonicSong(rec)
-	}
-
+func WrapExternalSearch(songs []model.SubsonicSong) map[string]any {
 	return map[string]any{
 		"subsonic-response": map[string]any{
 			"status":  "ok",

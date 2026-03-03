@@ -4,21 +4,47 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/GerardPolloRebozado/navitube/src/client"
-	"github.com/GerardPolloRebozado/navitube/src/config"
-	"github.com/GerardPolloRebozado/navitube/src/util"
+	"github.com/GerardPolloRebozado/navifetch/src/config"
+	"github.com/GerardPolloRebozado/navifetch/src/metadata"
+	"github.com/GerardPolloRebozado/navifetch/src/model"
+	"github.com/GerardPolloRebozado/navifetch/src/util"
 )
 
-func DownloadTrack(cfg *config.Config, artist, album, title, targetPath, coverURL string, authParams url.Values) {
+type StreamService struct {
+	cfg      *config.Config
+	metadata metadata.Provider
+}
+
+func NewStreamService(cfg *config.Config, metadata metadata.Provider) *StreamService {
+	return &StreamService{
+		cfg:      cfg,
+		metadata: metadata,
+	}
+}
+
+func (s *StreamService) DownloadTrack(trackID string, permanent bool) (*model.SubsonicSong, string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	res, err := s.metadata.GetSong(ctx, trackID)
+	if err != nil {
+		log.Printf("Background download failed lookup for %s: %v", trackID, err)
+		return nil, "", err
+	}
+
+	artist := strings.TrimSuffix(res.Artist, "(external)")
+	album := strings.TrimSuffix(res.Album, "(external)")
+	title := strings.TrimSuffix(res.Title, "(external)")
+	coverURL := res.CoverArt
+	targetPath := util.GetTrackPath(s.cfg, artist, album, title, permanent)
 	if _, err := os.Stat(targetPath); err == nil {
-		return
+		return res, targetPath, nil
 	}
 
 	log.Printf("Saving permanent copy for Navidrome: %s", targetPath)
@@ -51,10 +77,12 @@ func DownloadTrack(cfg *config.Config, artist, album, title, targetPath, coverUR
 
 	args := []string{
 		"-x", "--audio-format", "mp3",
-		"--add-metadata",
 		"--postprocessor-args", ffmpegArgs,
 		"-o", targetPath,
 		"--no-playlist",
+		"--add-metadata",
+		"--postprocessor-args",
+		"Metadata:-metadata musicbrainz_trackid=" + trackID,
 	}
 	if coverPath != "" {
 		args = append(args, "--embed-thumbnail")
@@ -64,12 +92,14 @@ func DownloadTrack(cfg *config.Config, artist, album, title, targetPath, coverUR
 
 	args = append(args, searchQuery)
 
-	cmd := exec.Command(cfg.YTDLPPath, args...)
+	cmd := exec.Command(s.cfg.YTDLPPath, args...)
 
 	if output, err := cmd.CombinedOutput(); err != nil {
 		log.Printf("Failed to save permanent copy: %v\nOutput: %s", err, string(output))
-	} else {
-		log.Printf("Successfully saved: %s", targetPath)
-		client.TriggerNavidromeScan(cfg.NavidromeBase, authParams)
+		return nil, "", err
 	}
+
+	log.Printf("Successfully saved: %s", targetPath)
+	GetSubsonicReverseProxy().TriggerNavidromeScan()
+	return res, targetPath, nil
 }
