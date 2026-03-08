@@ -18,7 +18,7 @@ This tool is intended for use with authorized content only. The developer is not
 ### Features
 
 - Seamless integration with Subsonic-compatible clients.
-- Automatic fallback to iTunes API for missing content.
+- Automatic fallback to iTunes/MusicBrainz API for missing content. (iTunes doesn't work very well)
 - Dynamic downloading and streaming.
 - Automatic cleanup of temporary files.
 - Persistent storage for tracks added to playlists.
@@ -39,14 +39,20 @@ services:
     environment:
       - NAVIDROME_BASE=http://navidrome:4533
     restart: unless-stopped
+    volumes:
+      - /path/to/music:/music
 
 ```
 
 ### Configuration
 
 Navifetch can be configured using the following environment variables:
+It is recommended to use MusicBrainz for metadata as iTunes wont be able to stream directly when downloading a song it will only be able to downlaod it.
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NAVIDROME_BASE` | **Required**. The base URL of your Subsonic/Navidrome server. | None |
+| Variable            | Description                                                   | Default |
+|---------------------|---------------------------------------------------------------|---------|
+| `NAVIDROME_BASE`    | **Required**. The base URL of your Subsonic/Navidrome server. | None    |
+| `COUNTRY`           | The country code to use for iTunes API requests.              | `US`    |
+| `METADATA_PROVIDER` | The metadata provider to use for. `itunes` or `musicbrainz`.  | None    |
+| `RESULTS_PER_PAGE`  | The number of results to display per page.                    | `10`    |
 

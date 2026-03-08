@@ -11,7 +11,6 @@ import (
 type Config struct {
 	NavidromeBase    string
 	Port             string
-	AdminJWT         string
 	MusicLibraryPath string
 	YTDLPPath        string
 	MetadataProvider string
@@ -31,7 +30,7 @@ func LoadConfig() (*Config, error) {
 
 	libPath := getEnv("MUSIC_LIBRARY_PATH", "/music")
 	var limit = 10
-	if l := getEnv("RESULTS_LIMIT", "10"); l != "" {
+	if l := getEnv("RESULTS_PER_PAGE", "10"); l != "" {
 		if parsed, err := strconv.ParseInt(l, 10, 8); err == nil {
 			limit = int(parsed)
 		}
@@ -40,7 +39,6 @@ func LoadConfig() (*Config, error) {
 	return &Config{
 		NavidromeBase:    base,
 		Port:             getEnv("PORT", "8080"),
-		AdminJWT:         os.Getenv("ADMIN_JWT"),
 		MusicLibraryPath: libPath,
 		YTDLPPath:        getEnv("YTDLP_PATH", "yt-dlp"),
 		MetadataProvider: getEnv("METADATA_PROVIDER", "itunes"),
