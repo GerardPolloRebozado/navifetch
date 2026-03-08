@@ -9,25 +9,34 @@ import (
 )
 
 type SearchService struct {
-	upstream NavidromeClient
+	rp       *SubsonicReverseProxy
 	metadata metadata.Provider
 }
 
-func NewSearchService(upstream NavidromeClient, metadata metadata.Provider) *SearchService {
+func NewSearchService(rp *SubsonicReverseProxy, metadata metadata.Provider) *SearchService {
 	return &SearchService{
-		upstream: upstream,
+		rp:       rp,
 		metadata: metadata,
 	}
 }
 
 func (s *SearchService) SmartSearch(ctx context.Context, query string, path string, rawQuery string) ([]byte, string, error) {
-	body, contentType, err := s.upstream.SearchNavidrome(ctx, path, rawQuery)
+	body, contentType, err := s.rp.SearchNavidrome(ctx, path, rawQuery)
 	if err == nil && body != nil {
 		bytes, err := json.Marshal(body)
 		if err != nil {
 			return nil, "", err
 		}
 		return bytes, contentType, nil
+	}
+
+	if len(body) > 0 {
+		jsonBody, err := json.Marshal(body)
+		if err != nil {
+			return nil, "", err
+		}
+
+		return jsonBody, "application/json; charset=utf-8", nil
 	}
 
 	songs, err := s.metadata.SearchSongs(ctx, query)

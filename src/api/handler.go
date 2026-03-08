@@ -12,7 +12,6 @@ import (
 
 	"github.com/GerardPolloRebozado/navifetch/src/config"
 	"github.com/GerardPolloRebozado/navifetch/src/metadata"
-	"github.com/GerardPolloRebozado/navifetch/src/model"
 	"github.com/GerardPolloRebozado/navifetch/src/service"
 )
 
@@ -50,9 +49,6 @@ func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) SmartSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("query")
-	if query == "" {
-		query = r.URL.Query().Get("any")
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 
@@ -120,51 +116,9 @@ func (h *Handler) ProxyStream(w http.ResponseWriter, r *http.Request) {
 		artist := songMetadata.Artist
 		mbid := trackID
 
-		// Polling loop to find the song in Navidrome
-		var foundSong *model.SubsonicSong
-		query := fmt.Sprintf("%s %s", artist, title)
-
-		// Use original query parameters to keep v, c, f, u, p etc.
-		searchParams := r.URL.Query()
-		searchParams.Set("query", query)
-		searchRawQuery := searchParams.Encode()
-
-		log.Printf("Searching Navidrome for exact match: %s (MBID: %s)", query, mbid)
-
-		for i := 0; i < 10; i++ {
-			searchResult, _, err := h.rp.SearchNavidrome(r.Context(), "/rest/search3.view", searchRawQuery)
-			if err == nil {
-				for _, song := range searchResult {
-					if song.MusicBrainzId == mbid {
-						log.Printf("Found exact match in Navidrome: %s (ID: %s)", song.Title, song.ID)
-						foundSong = &song
-						break
-					}
-				}
-			}
-
-			if foundSong != nil {
-				break
-			}
-
-			if i < 9 {
-				log.Printf("Exact match not found yet, retrying in 2s... (attempt %d/10)", i+1)
-				time.Sleep(2 * time.Second)
-				// Re-trigger scan with auth
-				go h.rp.SendNavidromeRequest(context.Background(), "/rest/startScan.view", r.URL.RawQuery)
-			}
-		}
-
-		if foundSong == nil {
-			log.Printf("Failed to find exact match by MBID, falling back to first search result for: %s", title)
-			searchResult, _, err := h.rp.SearchNavidrome(r.Context(), "/rest/search3.view", searchRawQuery)
-			if err == nil && len(searchResult) > 0 {
-				foundSong = &searchResult[0]
-			}
-		}
-
-		if foundSong == nil {
-			http.Error(w, "Song not found in Navidrome after download", http.StatusNotFound)
+		foundSong, err := h.rp.FindNavidromeSongID(artist, title, mbid, r)
+		if err != nil {
+			http.Error(w, "Failed to find song in Navidrome", http.StatusInternalServerError)
 			return
 		}
 
@@ -178,32 +132,37 @@ func (h *Handler) ProxyStream(w http.ResponseWriter, r *http.Request) {
 	h.rp.ServeHTTP(w, r)
 }
 
-func (h *Handler) ProxyPlaylistOrQueue(w http.ResponseWriter, r *http.Request) {
-	ids := []string{}
-	ids = append(ids, r.URL.Query()["songId"]...)
-	ids = append(ids, r.URL.Query()["songIdToAdd"]...)
-	ids = append(ids, r.URL.Query()["id"]...)
+func (h *Handler) ProxyPlaylist(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("songIdToAdd")
 
-	hasExternal := false
-	permanent := strings.Contains(r.URL.Path, "Playlist")
+	if strings.HasPrefix(id, "external-") {
+		id = strings.TrimPrefix(id, "external-")
 
-	for _, id := range ids {
-		if strings.HasPrefix(id, "external-") {
-			hasExternal = true
-			trackID := strings.TrimPrefix(id, "external-")
-			go h.streamService.DownloadTrack(trackID, permanent)
+		songMetadata, _, err := h.streamService.DownloadTrack(id, true)
+		if err != nil {
+			http.Error(w, "Failed to prepare track for streaming", http.StatusInternalServerError)
+			return
 		}
-	}
-
-	if hasExternal {
-		resp := map[string]any{
-			"subsonic-response": map[string]any{
-				"status":  "ok",
-				"version": "1.16.1",
-			},
+		subsonicUser := r.URL.Query().Get("u")
+		subsonicPass := r.URL.Query().Get("p")
+		if subsonicUser == "" && subsonicPass == "" {
+			http.Error(w, "Failed to get auth parameters", http.StatusInternalServerError)
+			return
 		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		json.NewEncoder(w).Encode(resp)
+
+		title := strings.TrimSuffix(songMetadata.Title, " (external)")
+		artist := songMetadata.Artist
+		mbid := id
+
+		foundSong, err := h.rp.FindNavidromeSongID(artist, title, mbid, r)
+		if err != nil {
+			http.Error(w, "Failed to find song in Navidrome", http.StatusInternalServerError)
+			return
+		}
+		q := r.URL.Query()
+		q.Set("songIdToAdd", foundSong.ID)
+		r.URL.RawQuery = q.Encode()
+		h.rp.ServeHTTP(w, r)
 		return
 	}
 	h.rp.ServeHTTP(w, r)
@@ -215,6 +174,9 @@ func (h *Handler) ProxyCoverArt(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 	size := r.URL.Query().Get("size")
 
+	if size == "" {
+		size = "250"
+	}
 	if strings.HasPrefix(id, "external-") {
 		trackId := strings.TrimPrefix(id, "external-")
 		sizeInt, err := strconv.ParseInt(size, 10, 64)

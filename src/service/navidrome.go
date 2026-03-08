@@ -23,17 +23,9 @@ type SubsonicReverseProxy struct {
 type NavidromeClient interface {
 	SendNavidromeRequest(ctx context.Context, path, rawQuery string) ([]byte, int, string, error)
 	SearchNavidrome(ctx context.Context, path, rawQuery string) ([]model.SubsonicSong, string, error)
-	TriggerNavidromeScan()
 }
 
 var subsonicReverseProxyInstance *SubsonicReverseProxy
-
-func GetSubsonicReverseProxy() *SubsonicReverseProxy {
-	if subsonicReverseProxyInstance == nil {
-		log.Fatal("Reverse proxy not initialized")
-	}
-	return subsonicReverseProxyInstance
-}
 
 func NewSubsonicReverseProxy(base string) (*SubsonicReverseProxy, error) {
 	if subsonicReverseProxyInstance != nil {
@@ -80,25 +72,6 @@ func (p *SubsonicReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	p.proxy.ServeHTTP(w, r)
 }
 
-func (p *SubsonicReverseProxy) TriggerNavidromeScan() {
-	scanURL := fmt.Sprintf("%s/rest/startScan.view", strings.TrimRight(p.base, "/"))
-
-	log.Println("Triggering Navidrome library scan...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	_, status, _, err := util.HTTPGet(ctx, scanURL, nil)
-	if err != nil {
-		log.Printf("Failed to trigger scan: %v", err)
-		return
-	}
-	if status != 200 {
-		log.Printf("Navidrome scan trigger returned status: %d", status)
-	} else {
-		log.Println("Navidrome scan triggered successfully.")
-	}
-}
-
 func (p *SubsonicReverseProxy) SendNavidromeRequest(ctx context.Context, path, rawQuery string) ([]byte, int, string, error) {
 	var urlBuilder strings.Builder
 	urlBuilder.WriteString(strings.TrimRight(p.base, "/"))
@@ -133,4 +106,50 @@ func (p *SubsonicReverseProxy) SearchNavidrome(ctx context.Context, path, rawQue
 		return nil, contentType, nil
 	}
 	return nil, "", err
+}
+
+func (p *SubsonicReverseProxy) FindNavidromeSongID(artist string, title string, mbid string, r *http.Request) (*model.SubsonicSong, error) {
+	var foundSong *model.SubsonicSong
+	query := fmt.Sprintf("%s %s", artist, title)
+
+	searchParams := r.URL.Query()
+	searchParams.Set("query", query)
+	searchRawQuery := searchParams.Encode()
+
+	log.Printf("Searching Navidrome for exact match: %s (MBID: %s)", query, mbid)
+
+	for i := 0; i < 10; i++ {
+		searchResult, _, err := p.SearchNavidrome(r.Context(), "/rest/search3.view", searchRawQuery)
+		if err == nil {
+			for _, song := range searchResult {
+				if song.MusicBrainzId == mbid {
+					log.Printf("Found exact match in Navidrome: %s (ID: %s)", song.Title, song.ID)
+					foundSong = &song
+					break
+				}
+			}
+		}
+
+		if foundSong != nil {
+			break
+		}
+
+		if i < 9 {
+			log.Printf("Exact match not found yet, retrying in 2s... (attempt %d/10)", i+1)
+			time.Sleep(2 * time.Second)
+			// Re-trigger scan with auth
+			go p.SendNavidromeRequest(context.Background(), "/rest/startScan.view", r.URL.RawQuery)
+		}
+	}
+
+	if foundSong == nil {
+		log.Printf("Failed to find exact match by MBID, falling back to first search result for: %s", title)
+		searchResult, _, err := p.SearchNavidrome(r.Context(), "/rest/search3.view", searchRawQuery)
+		if err == nil && len(searchResult) > 0 {
+			foundSong = &searchResult[0]
+		}
+		return nil, fmt.Errorf("song not found in Navidrome after download")
+	}
+
+	return foundSong, nil
 }

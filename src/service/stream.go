@@ -100,6 +100,5 @@ func (s *StreamService) DownloadTrack(trackID string, permanent bool) (*model.Su
 	}
 
 	log.Printf("Successfully saved: %s", targetPath)
-	GetSubsonicReverseProxy().TriggerNavidromeScan()
 	return res, targetPath, nil
 }

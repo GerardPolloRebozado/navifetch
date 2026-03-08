@@ -24,12 +24,12 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("/rest/getSong.view", h.ProxyMetadata)
 	mux.HandleFunc("/rest/getSong", h.ProxyMetadata)
 
-	mux.HandleFunc("/rest/createPlaylist.view", h.ProxyPlaylistOrQueue)
-	mux.HandleFunc("/rest/createPlaylist", h.ProxyPlaylistOrQueue)
-	mux.HandleFunc("/rest/updatePlaylist.view", h.ProxyPlaylistOrQueue)
-	mux.HandleFunc("/rest/updatePlaylist", h.ProxyPlaylistOrQueue)
-	mux.HandleFunc("/rest/savePlayQueue.view", h.ProxyPlaylistOrQueue)
-	mux.HandleFunc("/rest/savePlayQueue", h.ProxyPlaylistOrQueue)
+	mux.HandleFunc("/rest/createPlaylist.view", h.ProxyPlaylist)
+	mux.HandleFunc("/rest/createPlaylist", h.ProxyPlaylist)
+	mux.HandleFunc("/rest/updatePlaylist.view", h.ProxyPlaylist)
+	mux.HandleFunc("/rest/updatePlaylist", h.ProxyPlaylist)
+	mux.HandleFunc("/rest/savePlayQueue.view", h.ProxyPlaylist)
+	mux.HandleFunc("/rest/savePlayQueue", h.ProxyPlaylist)
 
 	// Catch-all reverse proxy
 	mux.HandleFunc("/", h.CatchAll)
