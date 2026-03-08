@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GerardPolloRebozado/navitube/src/api"
-	"github.com/GerardPolloRebozado/navitube/src/client"
-	"github.com/GerardPolloRebozado/navitube/src/config"
-	"github.com/GerardPolloRebozado/navitube/src/service"
+	"github.com/GerardPolloRebozado/navifetch/src/api"
+	"github.com/GerardPolloRebozado/navifetch/src/config"
+	"github.com/GerardPolloRebozado/navifetch/src/service"
 )
 
 func main() {
@@ -17,7 +16,7 @@ func main() {
 		log.Fatalf("config load error: %v", err)
 	}
 
-	rp, err := client.NewReverseProxy(cfg.NavidromeBase)
+	rp, err := service.NewSubsonicReverseProxy(cfg.NavidromeBase)
 	if err != nil {
 		log.Fatalf("proxy creation error: %v", err)
 	}

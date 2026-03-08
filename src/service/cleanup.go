@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/GerardPolloRebozado/navitube/src/config"
+	"github.com/GerardPolloRebozado/navifetch/src/config"
 )
 
 func StartCleanupCron(cfg *config.Config) {

@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // ExternalItem represents an ephemeral search result.
 type ExternalItem struct {
@@ -26,19 +29,19 @@ type SubsonicSearchResponse struct {
 		Status        string         `json:"status"`
 		Version       string         `json:"version"`
 		SearchResult3 *SearchResult3 `json:"searchResult3,omitempty"`
-		Song          *SubsonicSong  `json:"song,omitempty"`
+		Song          []SubsonicSong `json:"song,omitempty"`
 	} `json:"subsonic-response"`
 }
 
 type SubsonicAlbumResponse struct {
 	Subsonic struct {
-		Status  string `json:"status"`
-		Version string `json:"version"`
-		Album   *Album `json:"album,omitempty"`
+		Status  string         `json:"status"`
+		Version string         `json:"version"`
+		Album   *SubsonicAlbum `json:"album,omitempty"`
 	} `json:"subsonic-response"`
 }
 
-type Album struct {
+type SubsonicAlbum struct {
 	ID        string         `json:"id"`
 	Parent    string         `json:"parent"`
 	Album     string         `json:"album"`
@@ -58,7 +61,40 @@ type Album struct {
 }
 
 type SearchResult3 struct {
-	Song any `json:"song"`
+	Song []SubsonicSong `json:"song"`
+}
+
+func (s *SearchResult3) UnmarshalJSON(data []byte) error {
+	type Alias SearchResult3
+	var aux struct {
+		Song any `json:"song"`
+		*Alias
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if aux.Song == nil {
+		return nil
+	}
+	switch aux.Song.(type) {
+	case []any:
+		// Re-unmarshal as slice of songs
+		var songs struct {
+			Song []SubsonicSong `json:"song"`
+		}
+		if err := json.Unmarshal(data, &songs); err == nil {
+			s.Song = songs.Song
+		}
+	case map[string]any:
+		// Single song object
+		var single struct {
+			Song SubsonicSong `json:"song"`
+		}
+		if err := json.Unmarshal(data, &single); err == nil {
+			s.Song = []SubsonicSong{single.Song}
+		}
+	}
+	return nil
 }
 
 type SubsonicSong struct {
@@ -72,11 +108,11 @@ type SubsonicSong struct {
 	Genre                 string    `json:"genre,omitempty"`
 	CoverArt              string    `json:"coverArt,omitempty"`
 	Duration              int64     `json:"duration"`
-	Size                  int64     `json:"size,omitempty"`
+	Size                  int64     `json:"size"`
 	IsDir                 bool      `json:"isDir"`
 	IsVideo               bool      `json:"isVideo"`
-	Suffix                string    `json:"suffix,omitempty"`
-	ContentType           string    `json:"contentType,omitempty"`
+	Suffix                string    `json:"suffix"`
+	ContentType           string    `json:"contentType"`
 	TranscodedSuffix      string    `json:"transcodedSuffix,omitempty"`
 	TranscodedContentType string    `json:"transcodedContentType,omitempty"`
 	Type                  string    `json:"type,omitempty"`
@@ -91,30 +127,28 @@ type SubsonicSong struct {
 	SortName              string    `json:"sortName,omitempty"`
 	MusicBrainzId         string    `json:"musicBrainzId,omitempty"`
 	DisplayArtist         string    `json:"displayArtist,omitempty"`
-	DisplayAlbumArtists   string    `json:"displayAlbumArtists,omitempty"`
+	DisplayAlbumArtist    string    `json:"displayAlbumArtist,omitempty"`
 	DisplayComposer       string    `json:"displayComposer,omitempty"`
 	ExplicitStatus        string    `json:"explicitStatus,omitempty"`
 }
 
-type ITunesAlbum struct {
-	WrapperType            string    `json:"wrapperType"`
-	CollectionType         string    `json:"collectionType"`
-	ArtistID               int       `json:"artistId"`
-	CollectionID           int       `json:"collectionId"`
-	AmgArtistID            int       `json:"amgArtistId"`
-	ArtistName             string    `json:"artistName"`
-	CollectionName         string    `json:"collectionName"`
-	CollectionCensoredName string    `json:"collectionCensoredName"`
-	ArtistViewURL          string    `json:"artistViewUrl"`
-	CollectionViewURL      string    `json:"collectionViewUrl"`
-	ArtworkURL60           string    `json:"artworkUrl60"`
-	ArtworkURL100          string    `json:"artworkUrl100"`
-	CollectionPrice        float64   `json:"collectionPrice"`
-	CollectionExplicitness string    `json:"collectionExplicitness"`
-	TrackCount             int       `json:"trackCount"`
-	Copyright              string    `json:"copyright"`
-	Country                string    `json:"country"`
-	Currency               string    `json:"currency"`
-	ReleaseDate            time.Time `json:"releaseDate"`
-	PrimaryGenreName       string    `json:"primaryGenreName"`
+type SubsonicIndexResponse struct {
+	Subsonic struct {
+		Status        string         `json:"status"`
+		Version       string         `json:"version"`
+		SearchResult3 *SearchResult3 `json:"searchResult3,omitempty"`
+		Indexes       struct {
+			Index []struct {
+				Name   string `json:"name"`
+				Artist []struct {
+					ID             string `json:"id"`
+					Name           string `json:"name"`
+					CoverArt       string `json:"coverArt"`
+					ArtistImageURL string `json:"artistImageUrl"`
+				} `json:"artist"`
+			} `json:"index"`
+			LastModified    int64  `json:"lastModified"`
+			IgnoredArticles string `json:"ignoredArticles"`
+		} `json:"indexes"`
+	} `json:"subsonic-response"`
 }

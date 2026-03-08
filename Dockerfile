@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o navifetch ./cmd/navitube
+RUN CGO_ENABLED=0 GOOS=linux go build -o navifetch ./cmd/navifetch
 
 FROM alpine:latest
 

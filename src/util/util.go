@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GerardPolloRebozado/navitube/src/config"
-	"github.com/GerardPolloRebozado/navitube/src/model"
+	"github.com/GerardPolloRebozado/navifetch/src/config"
+	"github.com/GerardPolloRebozado/navifetch/src/model"
 )
 
 // HTTPGet is a simple helper to make GET requests.
