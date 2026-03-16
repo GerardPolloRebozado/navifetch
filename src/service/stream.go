@@ -75,6 +75,11 @@ func (s *StreamService) DownloadTrack(trackID string, permanent bool) (*model.Su
 
 	ffmpegArgs := fmt.Sprintf("ffmpeg:-metadata title='%s' -metadata artist='%s' -metadata album='%s'", safeTitle, safeArtist, safeAlbum)
 
+	cleanMBID := trackID
+	if strings.HasPrefix(cleanMBID, "external-") {
+		cleanMBID = strings.TrimPrefix(cleanMBID, "external-")
+	}
+
 	args := []string{
 		"-x", "--audio-format", "mp3",
 		"--postprocessor-args", ffmpegArgs,
@@ -82,7 +87,7 @@ func (s *StreamService) DownloadTrack(trackID string, permanent bool) (*model.Su
 		"--no-playlist",
 		"--add-metadata",
 		"--postprocessor-args",
-		"Metadata:-metadata musicbrainz_trackid=" + trackID,
+		"Metadata:-metadata musicbrainz_trackid=" + cleanMBID,
 	}
 	if coverPath != "" {
 		args = append(args, "--embed-thumbnail")

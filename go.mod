@@ -11,5 +11,7 @@ require (
 
 require (
 	github.com/go-resty/resty/v2 v2.17.1 // indirect
+	github.com/google/go-querystring v1.2.0 // indirect
+	github.com/twoscott/gobble-fm v1.0.9 // indirect
 	golang.org/x/net v0.48.0 // indirect
 )

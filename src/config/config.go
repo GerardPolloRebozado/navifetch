@@ -16,6 +16,7 @@ type Config struct {
 	MetadataProvider string
 	Country          string
 	Limit            int
+	LastFMApiKey     string
 }
 
 func LoadConfig() (*Config, error) {
@@ -44,6 +45,7 @@ func LoadConfig() (*Config, error) {
 		MetadataProvider: getEnv("METADATA_PROVIDER", "itunes"),
 		Country:          getEnv("COUNTRY", "US"),
 		Limit:            limit,
+		LastFMApiKey:     getEnv("LASTFM_API_KEY", ""),
 	}, nil
 }
 
