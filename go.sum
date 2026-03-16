@@ -1,9 +1,14 @@
 github.com/go-resty/resty/v2 v2.17.1 h1:x3aMpHK1YM9e4va/TMDRlusDDoZiQ+ViDu/WpA6xTM4=
 github.com/go-resty/resty/v2 v2.17.1/go.mod h1:kCKZ3wWmwJaNc7S29BRtUhJwy7iqmn+2mLtQrOyQlVA=
+github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
+github.com/google/go-querystring v1.2.0 h1:yhqkPbu2/OH+V9BfpCVPZkNmUXhb2gBxJArfhIxNtP0=
+github.com/google/go-querystring v1.2.0/go.mod h1:8IFJqpSRITyJ8QhQ13bmbeMBDfmeEJZD5A0egEOmkqU=
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/torabit/itunes v0.0.0-20230702053550-80ae037e7f4f h1:xMCVryBmnnZP14qap4kDHrE7c7YmvhVDaDMCMMT7Pdw=
 github.com/torabit/itunes v0.0.0-20230702053550-80ae037e7f4f/go.mod h1:Hm4MVfhzwIYmI8+6Az10Gh8VEEM+LTw2TfP8QZJ/G34=
+github.com/twoscott/gobble-fm v1.0.9 h1:FfEKNbalQo/FK5IV7Pn/Jp39Tku98uNsnyuQK6/eyoQ=
+github.com/twoscott/gobble-fm v1.0.9/go.mod h1:uiQfweUmQu8bxrlP+2e8wSeoMgV/OfV7FAZvOXewyUk=
 go.uploadedlobster.com/mbtypes v0.4.0 h1:D5asCgHsRWufj4Yn5u0IuH2J9z1UuYImYkYIp1Z1Q7s=
 go.uploadedlobster.com/mbtypes v0.4.0/go.mod h1:Bu1K1Hl77QTAE2Z7QKiW/JAp9KqYWQebkRRfG02dlZM=
 go.uploadedlobster.com/musicbrainzws2 v0.18.0 h1:fNhAadkhq6L9x+p02xhU6yrQ6AJq892gt+LMkvwf9/w=

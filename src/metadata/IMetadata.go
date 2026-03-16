@@ -18,7 +18,7 @@ type Provider interface {
 
 var metadataProvider Provider
 
-func NewProvider(name string, country string, limit int) (Provider, error) {
+func NewProvider(name string, country string, limit int, apiKey string) (Provider, error) {
 	if metadataProvider != nil {
 		return metadataProvider, nil
 	}
@@ -29,14 +29,10 @@ func NewProvider(name string, country string, limit int) (Provider, error) {
 	case "musicbrainz":
 		metadataProvider = NewMusicBrainzProvider(limit)
 		return metadataProvider, nil
+	case "lastfm":
+		metadataProvider = NewLastFMProvider(apiKey, limit)
+		return metadataProvider, nil
 	default:
 		return nil, fmt.Errorf("unsupported metadata provider: %s", name)
 	}
-}
-
-func GetProvider() Provider {
-	if metadataProvider == nil {
-		panic("metadata provider not initialized")
-	}
-	return metadataProvider
 }

@@ -112,18 +112,29 @@ func (p *SubsonicReverseProxy) FindNavidromeSongID(artist string, title string, 
 	var foundSong *model.SubsonicSong
 	query := fmt.Sprintf("%s %s", artist, title)
 
+	// Use background context with timeout for Navidrome searches to avoid cancellation if a client disconnects
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
 	searchParams := r.URL.Query()
 	searchParams.Set("query", query)
 	searchRawQuery := searchParams.Encode()
 
 	log.Printf("Searching Navidrome for exact match: %s (MBID: %s)", query, mbid)
 
-	for i := 0; i < 10; i++ {
-		searchResult, _, err := p.SearchNavidrome(r.Context(), "/rest/search3.view", searchRawQuery)
+	for i := 0; i < 15; i++ {
+		searchResult, _, err := p.SearchNavidrome(ctx, "/rest/search3.view", searchRawQuery)
 		if err == nil {
 			for _, song := range searchResult {
-				if song.MusicBrainzId == mbid {
-					log.Printf("Found exact match in Navidrome: %s (ID: %s)", song.Title, song.ID)
+				// 1. Try match by MBID if available
+				if mbid != "" && song.MusicBrainzId == mbid {
+					log.Printf("Found exact match in Navidrome by MBID: %s (ID: %s)", song.Title, song.ID)
+					foundSong = &song
+					break
+				}
+				// 2. Try match by Artist and Title as fallback
+				if strings.EqualFold(song.Artist, artist) && strings.EqualFold(song.Title, title) {
+					log.Printf("Found match in Navidrome by Artist/Title: %s - %s (ID: %s)", song.Artist, song.Title, song.ID)
 					foundSong = &song
 					break
 				}
@@ -131,25 +142,22 @@ func (p *SubsonicReverseProxy) FindNavidromeSongID(artist string, title string, 
 		}
 
 		if foundSong != nil {
-			break
+			return foundSong, nil
 		}
 
-		if i < 9 {
-			log.Printf("Exact match not found yet, retrying in 2s... (attempt %d/10)", i+1)
+		if i < 14 {
+			log.Printf("Match not found yet, retrying in 2s... (attempt %d/15)", i+1)
 			time.Sleep(2 * time.Second)
-			// Re-trigger scan with auth
+			// Re-trigger scan
 			go p.SendNavidromeRequest(context.Background(), "/rest/startScan.view", r.URL.RawQuery)
 		}
 	}
 
-	if foundSong == nil {
-		log.Printf("Failed to find exact match by MBID, falling back to first search result for: %s", title)
-		searchResult, _, err := p.SearchNavidrome(r.Context(), "/rest/search3.view", searchRawQuery)
-		if err == nil && len(searchResult) > 0 {
-			foundSong = &searchResult[0]
-		}
-		return nil, fmt.Errorf("song not found in Navidrome after download")
+	log.Printf("Failed to find exact match, falling back to first search result for: %s", title)
+	searchResult, _, err := p.SearchNavidrome(ctx, "/rest/search3.view", searchRawQuery)
+	if err == nil && len(searchResult) > 0 {
+		return &searchResult[0], nil
 	}
 
-	return foundSong, nil
+	return nil, fmt.Errorf("song not found in Navidrome after download")
 }

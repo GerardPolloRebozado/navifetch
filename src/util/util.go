@@ -67,8 +67,9 @@ func SanitizeFilename(s string) string {
 }
 
 func IsSongInSubsonicSongList(name string, subsonicList []model.SubsonicSong) bool {
+	cleanName := strings.ToLower(strings.TrimSpace(name))
 	for _, song := range subsonicList {
-		if strings.ToLower(name) == strings.ToLower(song.Title) {
+		if cleanName == strings.ToLower(strings.TrimSpace(song.Title)) {
 			return true
 		}
 	}

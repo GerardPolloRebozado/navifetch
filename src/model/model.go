@@ -42,22 +42,23 @@ type SubsonicAlbumResponse struct {
 }
 
 type SubsonicAlbum struct {
-	ID        string         `json:"id"`
-	Parent    string         `json:"parent"`
-	Album     string         `json:"album"`
-	Title     string         `json:"title"`
-	Name      string         `json:"name"`
-	IsDir     bool           `json:"isDir"`
-	CoverArt  string         `json:"coverArt"`
-	SongCount int64          `json:"songCount"`
-	Created   time.Time      `json:"created"`
-	Duration  int            `json:"duration"`
-	PlayCount int            `json:"playCount"`
-	ArtistID  string         `json:"artistId"`
-	Artist    string         `json:"artist"`
-	Year      int            `json:"year"`
-	Genre     string         `json:"genre"`
-	Song      []SubsonicSong `json:"song"`
+	ID            string         `json:"id"`
+	Parent        string         `json:"parent"`
+	Album         string         `json:"album"`
+	Title         string         `json:"title"`
+	Name          string         `json:"name"`
+	IsDir         bool           `json:"isDir"`
+	CoverArt      string         `json:"coverArt"`
+	SongCount     int64          `json:"songCount"`
+	Created       time.Time      `json:"created"`
+	Duration      int            `json:"duration"`
+	PlayCount     int            `json:"playCount"`
+	ArtistID      string         `json:"artistId"`
+	Artist        string         `json:"artist"`
+	Year          int            `json:"year"`
+	Genre         string         `json:"genre"`
+	MusicBrainzId string         `json:"musicBrainzId"`
+	Song          []SubsonicSong `json:"song"`
 }
 
 type SearchResult3 struct {

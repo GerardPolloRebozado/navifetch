@@ -26,7 +26,7 @@ type Handler struct {
 }
 
 func NewHandler(cfg *config.Config, rp *service.SubsonicReverseProxy) *Handler {
-	p, err := metadata.NewProvider(cfg.MetadataProvider, cfg.Country, cfg.Limit)
+	p, err := metadata.NewProvider(cfg.MetadataProvider, cfg.Country, cfg.Limit, cfg.LastFMApiKey)
 	if err != nil {
 		log.Fatalf("Failed to initialize metadata provider: %v", err)
 	}
@@ -41,7 +41,7 @@ func NewHandler(cfg *config.Config, rp *service.SubsonicReverseProxy) *Handler {
 	}
 }
 
-func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) Healthz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
@@ -114,7 +114,13 @@ func (h *Handler) ProxyStream(w http.ResponseWriter, r *http.Request) {
 
 		title := strings.TrimSuffix(songMetadata.Title, " (external)")
 		artist := songMetadata.Artist
-		mbid := trackID
+		mbid := songMetadata.MusicBrainzId
+		if mbid == "" {
+			mbid = trackID
+			if strings.HasPrefix(mbid, "external-") {
+				mbid = strings.TrimPrefix(mbid, "external-")
+			}
+		}
 
 		foundSong, err := h.rp.FindNavidromeSongID(artist, title, mbid, r)
 		if err != nil {
@@ -152,7 +158,13 @@ func (h *Handler) ProxyPlaylist(w http.ResponseWriter, r *http.Request) {
 
 		title := strings.TrimSuffix(songMetadata.Title, " (external)")
 		artist := songMetadata.Artist
-		mbid := id
+		mbid := songMetadata.MusicBrainzId
+		if mbid == "" {
+			mbid = id
+			if strings.HasPrefix(mbid, "external-") {
+				mbid = strings.TrimPrefix(mbid, "external-")
+			}
+		}
 
 		foundSong, err := h.rp.FindNavidromeSongID(artist, title, mbid, r)
 		if err != nil {
