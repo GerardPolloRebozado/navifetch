@@ -29,7 +29,7 @@ func (p *MusicBrainzProvider) GetAlbum(ctx context.Context, id string) (*model.S
 func NewMusicBrainzProvider(limit int) *MusicBrainzProvider {
 	return &MusicBrainzProvider{musicbrainzws2.NewClient(musicbrainzws2.AppInfo{
 		Name:    "navifetch",
-		Version: "0.9",
+		Version: "0.10.0",
 		URL:     "https://github.com/GerardPolloRebozado/navifetch",
 	}),
 		musicbrainzws2.Paginator{
