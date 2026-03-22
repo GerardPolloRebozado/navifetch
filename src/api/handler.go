@@ -52,6 +52,10 @@ func (h *Handler) SmartSearch(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 
+	log.Printf("Search query: %s", query)
+	if query == "\"\"" || query == "" {
+		h.rp.ServeHTTP(w, r)
+	}
 	body, contentType, err := h.searchService.SmartSearch(ctx, query, r.URL.Path, r.URL.RawQuery)
 	if err != nil {
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
