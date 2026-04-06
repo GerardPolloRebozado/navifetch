@@ -21,21 +21,13 @@ func NewSearchService(rp *SubsonicReverseProxy, metadata metadata.Provider) *Sea
 }
 
 func (s *SearchService) SmartSearch(ctx context.Context, query string, path string, rawQuery string) ([]byte, string, error) {
-	body, contentType, err := s.rp.SearchNavidrome(ctx, path, rawQuery)
-	if err == nil && body != nil {
-		bytes, err := json.Marshal(body)
+	subsonicSongs, _, err := s.rp.SearchNavidrome(ctx, path, rawQuery)
+
+	if len(subsonicSongs) > 0 {
+		jsonBody, err := json.Marshal(WrapExternalSearch(subsonicSongs))
 		if err != nil {
 			return nil, "", err
 		}
-		return bytes, contentType, nil
-	}
-
-	if len(body) > 0 {
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			return nil, "", err
-		}
-
 		return jsonBody, "application/json; charset=utf-8", nil
 	}
 
