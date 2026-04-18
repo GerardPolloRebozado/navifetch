@@ -61,10 +61,6 @@ type SubsonicAlbum struct {
 	Song          []SubsonicSong `json:"song"`
 }
 
-type SearchResult3 struct {
-	Song []SubsonicSong `json:"song"`
-}
-
 func (s *SearchResult3) UnmarshalJSON(data []byte) error {
 	type Alias SearchResult3
 	var aux struct {
@@ -98,12 +94,28 @@ func (s *SearchResult3) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type SubsonicResponseWrapper struct {
+	SubsonicResponse SubsonicSearchResponseBody `json:"subsonic-response"`
+}
+
+type SubsonicSearchResponseBody struct {
+	Status        string        `json:"status"`
+	Version       string        `json:"version"`
+	SearchResult3 SearchResult3 `json:"searchResult3"`
+}
+
+type SearchResult3 struct {
+	Song   []SubsonicSong   `json:"song"`
+	Album  []map[string]any `json:"album"`
+	Artist []map[string]any `json:"artist"`
+}
+
 type SubsonicSong struct {
 	ID                    string    `json:"id"`
 	Parent                string    `json:"parent,omitempty"`
 	Title                 string    `json:"title"`
 	Artist                string    `json:"artist"`
-	ArtistID              string    `json:"artistId,omitempty"`
+	ArtistID              string    `json:"artistId"`
 	Album                 string    `json:"album"`
 	AlbumID               string    `json:"albumId,omitempty"`
 	Genre                 string    `json:"genre,omitempty"`

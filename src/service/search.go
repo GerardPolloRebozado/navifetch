@@ -45,13 +45,15 @@ func (s *SearchService) SmartSearch(ctx context.Context, query string, path stri
 	return jsonBody, "application/json; charset=utf-8", nil
 }
 
-func WrapExternalSearch(songs []model.SubsonicSong) map[string]any {
-	return map[string]any{
-		"subsonic-response": map[string]any{
-			"status":  "ok",
-			"version": "1.16.1",
-			"searchResult3": map[string]any{
-				"song": songs,
+func WrapExternalSearch(songs []model.SubsonicSong) any {
+	return model.SubsonicResponseWrapper{
+		SubsonicResponse: model.SubsonicSearchResponseBody{
+			Status:  "ok",
+			Version: "1.16.1",
+			SearchResult3: model.SearchResult3{
+				Song:   songs,
+				Album:  []map[string]any{},
+				Artist: []map[string]any{},
 			},
 		},
 	}
