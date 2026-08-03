@@ -32,6 +32,9 @@ func NewProvider(name string, country string, limit int, apiKey string) (Provide
 	case "lastfm":
 		metadataProvider = NewLastFMProvider(apiKey, limit)
 		return metadataProvider, nil
+	case "aggregator", "":
+		metadataProvider = NewAggregatorProvider(country, limit)
+		return metadataProvider, nil
 	default:
 		return nil, fmt.Errorf("unsupported metadata provider: %s", name)
 	}

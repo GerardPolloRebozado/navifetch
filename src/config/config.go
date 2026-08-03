@@ -42,7 +42,7 @@ func LoadConfig() (*Config, error) {
 		Port:             getEnv("PORT", "8080"),
 		MusicLibraryPath: libPath,
 		YTDLPPath:        getEnv("YTDLP_PATH", "yt-dlp"),
-		MetadataProvider: getEnv("METADATA_PROVIDER", "itunes"),
+		MetadataProvider: getEnv("METADATA_PROVIDER", "aggregator"),
 		Country:          getEnv("COUNTRY", "US"),
 		Limit:            limit,
 		LastFMApiKey:     getEnv("LASTFM_API_KEY", ""),

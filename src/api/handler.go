@@ -49,12 +49,29 @@ func (h *Handler) Healthz(w http.ResponseWriter, _ *http.Request) {
 
 func (h *Handler) SmartSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("query")
+	if query == "" {
+		query = r.URL.Query().Get("q")
+	}
+	if query == "" {
+		query = r.URL.Query().Get("any")
+	}
+	if query == "" {
+		query = r.URL.Query().Get("song")
+	}
+	if query == "" {
+		query = r.URL.Query().Get("title")
+	}
+	if query == "" {
+		query = r.URL.Query().Get("artist")
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 
 	log.Printf("Search query: %s", query)
 	if query == "\"\"" || query == "" {
 		h.rp.ServeHTTP(w, r)
+		return
 	}
 	body, contentType, err := h.searchService.SmartSearch(ctx, query, r.URL.Path, r.URL.RawQuery)
 	if err != nil {
@@ -103,40 +120,17 @@ func (h *Handler) ProxyStream(w http.ResponseWriter, r *http.Request) {
 
 	if strings.HasPrefix(id, "external-") {
 		trackID := strings.TrimPrefix(id, "external-")
-		songMetadata, _, err := h.streamService.DownloadTrack(trackID, permanent)
+		_, targetPath, err := h.streamService.DownloadTrack(trackID, permanent)
 		if err != nil {
 			http.Error(w, "Failed to prepare track for streaming", http.StatusInternalServerError)
 			return
 		}
 
-		subsonicUser := r.URL.Query().Get("u")
-		subsonicPass := r.URL.Query().Get("p")
-		if subsonicUser == "" && subsonicPass == "" {
-			http.Error(w, "Failed to get auth parameters", http.StatusInternalServerError)
-			return
-		}
+		// Trigger background scan asynchronously so Navidrome indexes the track without delaying playback
+		go h.rp.SendNavidromeRequest(context.Background(), "/rest/startScan.view", r.URL.RawQuery)
 
-		title := strings.TrimSuffix(songMetadata.Title, " (external)")
-		artist := songMetadata.Artist
-		mbid := songMetadata.MusicBrainzId
-		if mbid == "" {
-			mbid = trackID
-			if strings.HasPrefix(mbid, "external-") {
-				mbid = strings.TrimPrefix(mbid, "external-")
-			}
-		}
-
-		foundSong, err := h.rp.FindNavidromeSongID(artist, title, mbid, r)
-		if err != nil {
-			http.Error(w, "Failed to find song in Navidrome", http.StatusInternalServerError)
-			return
-		}
-
-		// Update request with the internal Navidrome ID
-		q := r.URL.Query()
-		q.Set("id", foundSong.ID)
-		r.URL.RawQuery = q.Encode()
-		h.rp.ServeHTTP(w, r)
+		log.Printf("Directly streaming track for %s from file: %s", trackID, targetPath)
+		http.ServeFile(w, r, targetPath)
 		return
 	}
 	h.rp.ServeHTTP(w, r)

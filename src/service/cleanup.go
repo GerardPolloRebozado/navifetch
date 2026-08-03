@@ -4,19 +4,36 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/GerardPolloRebozado/navifetch/src/config"
 )
 
 func StartCleanupCron(cfg *config.Config) {
+	go UpdateYTDLP(cfg)
+
 	ticker := time.NewTicker(24 * time.Hour)
 
 	go func() {
 		for range ticker.C {
 			CleanupJob(cfg)
+			UpdateYTDLP(cfg)
 		}
 	}()
+}
+
+func UpdateYTDLP(cfg *config.Config) {
+	slog.Info("Checking for yt-dlp self-update...")
+	cmd := exec.Command(cfg.YTDLPPath, "-U")
+	output, err := cmd.CombinedOutput()
+	outStr := strings.TrimSpace(string(output))
+	if err != nil {
+		slog.Warn("yt-dlp update output", "status", outStr, "error", err)
+		return
+	}
+	slog.Info("yt-dlp update status", "output", outStr)
 }
 
 func IsFolderEmpty(name string) (bool, error) {

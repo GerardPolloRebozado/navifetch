@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/GerardPolloRebozado/navifetch/src/model"
@@ -90,6 +91,12 @@ func (p *ItunesProvider) GetSong(ctx context.Context, id string) (*model.Subsoni
 }
 
 func (p *ItunesProvider) GetCoverArt(ctx context.Context, id string, _ int64) ([]byte, string, error) {
+	unescaped, err := url.QueryUnescape(id)
+	if err == nil && (strings.HasPrefix(unescaped, "http://") || strings.HasPrefix(unescaped, "https://")) {
+		body, _, contentType, err := util.HTTPGet(ctx, unescaped, nil)
+		return body, contentType, err
+	}
+
 	parsedId, err := strconv.ParseInt(id, 10, 32)
 	if err != nil {
 		return nil, "", err

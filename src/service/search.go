@@ -21,22 +21,16 @@ func NewSearchService(rp *SubsonicReverseProxy, metadata metadata.Provider) *Sea
 }
 
 func (s *SearchService) SmartSearch(ctx context.Context, query string, path string, rawQuery string) ([]byte, string, error) {
-	subsonicSongs, _, err := s.rp.SearchNavidrome(ctx, path, rawQuery)
+	subsonicSongs, _, _ := s.rp.SearchNavidrome(ctx, path, rawQuery)
 
-	if len(subsonicSongs) > 0 {
-		jsonBody, err := json.Marshal(WrapExternalSearch(subsonicSongs))
-		if err != nil {
-			return nil, "", err
-		}
-		return jsonBody, "application/json; charset=utf-8", nil
-	}
-
-	songs, err := s.metadata.SearchSongs(ctx, query)
+	externalSongs, err := s.metadata.SearchSongs(ctx, query)
 	if err != nil {
-		return nil, "", err
+		externalSongs = nil
 	}
 
-	resp := WrapExternalSearch(songs)
+	allSongs := append(subsonicSongs, externalSongs...)
+
+	resp := WrapExternalSearch(allSongs)
 	jsonBody, err := json.Marshal(resp)
 	if err != nil {
 		return nil, "", err
@@ -46,15 +40,24 @@ func (s *SearchService) SmartSearch(ctx context.Context, query string, path stri
 }
 
 func WrapExternalSearch(songs []model.SubsonicSong) any {
-	return model.SubsonicResponseWrapper{
-		SubsonicResponse: model.SubsonicSearchResponseBody{
-			Status:  "ok",
-			Version: "1.16.1",
-			SearchResult3: model.SearchResult3{
-				Song:   songs,
-				Album:  []map[string]any{},
-				Artist: []map[string]any{},
-			},
+	if songs == nil {
+		songs = []model.SubsonicSong{}
+	}
+	sr := model.SearchResult3{
+		Song:   songs,
+		Album:  []map[string]any{},
+		Artist: []map[string]any{},
+	}
+	return map[string]any{
+		"subsonic-response": map[string]any{
+			"status":        "ok",
+			"version":       "1.16.1",
+			"type":          "navidrome",
+			"serverVersion": "0.52.5",
+			"openSubsonic":  true,
+			"searchResult3": sr,
+			"searchResult2": sr,
+			"searchResult":  sr,
 		},
 	}
 }

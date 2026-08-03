@@ -67,18 +67,22 @@ func (s *StreamService) DownloadTrack(trackID string, permanent bool) (*model.Su
 		}
 	}
 
+	cleanMBID := trackID
+	if strings.HasPrefix(cleanMBID, "external-") {
+		cleanMBID = strings.TrimPrefix(cleanMBID, "external-")
+	}
+
 	searchQuery := fmt.Sprintf("ytsearch1:%s - %s Audio", artist, title)
+	if strings.HasPrefix(cleanMBID, "yt-") {
+		ytID := strings.TrimPrefix(cleanMBID, "yt-")
+		searchQuery = fmt.Sprintf("https://www.youtube.com/watch?v=%s", ytID)
+	}
 
 	safeTitle := strings.ReplaceAll(title, "'", "")
 	safeArtist := strings.ReplaceAll(artist, "'", "")
 	safeAlbum := strings.ReplaceAll(album, "'", "")
 
 	ffmpegArgs := fmt.Sprintf("ffmpeg:-metadata title='%s' -metadata artist='%s' -metadata album='%s'", safeTitle, safeArtist, safeAlbum)
-
-	cleanMBID := trackID
-	if strings.HasPrefix(cleanMBID, "external-") {
-		cleanMBID = strings.TrimPrefix(cleanMBID, "external-")
-	}
 
 	args := []string{
 		"-x", "--audio-format", "mp3",

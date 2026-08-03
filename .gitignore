@@ -1,13 +1,18 @@
 # Binaries
 navifetch
+main
 
 # Test binary
 *.test
 
 # Project specific
 downloads/
+dev_data/
 tmp/
 .env
+.envrc
+.devenv/
+.direnv/
 
 # IDEs
 .idea/

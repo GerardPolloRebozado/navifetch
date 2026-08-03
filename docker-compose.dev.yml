@@ -1,0 +1,34 @@
+services:
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome-dev
+    ports:
+      - "4533:4533"
+    environment:
+      ND_MUSICFOLDER: /music
+      ND_DATAFOLDER: /data
+      ND_LOGLEVEL: info
+      ND_SCANINTERVAL: 1m
+      ND_INITIALSCAN: "true"
+    volumes:
+      - ./dev_data/navidrome:/data
+      - ./dev_data/music:/music
+    restart: unless-stopped
+
+  navifetch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: navifetch-dev
+    ports:
+      - "8080:8080"
+    environment:
+      NAVIDROME_BASE: http://navidrome:4533
+      METADATA_PROVIDER: aggregator
+      COUNTRY: US
+      RESULTS_PER_PAGE: 10
+    volumes:
+      - ./dev_data/music:/music
+    depends_on:
+      - navidrome
+    restart: unless-stopped

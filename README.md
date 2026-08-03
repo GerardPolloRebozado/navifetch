@@ -18,12 +18,18 @@ This tool is intended for use with authorized content only. The developer is not
 ### Features
 
 - Seamless integration with Subsonic-compatible clients.
-- Automatic fallback to LastFM/iTunes/MusicBrainz API for missing content. (iTunes doesn't work very well)
-- Dynamic downloading and streaming.
-- Automatic cleanup of temporary files.
-- Persistent storage for tracks is added to playlists.
+- Dynamic on-demand downloading and streaming.
 
-### Installation
+### Installation & Development
+
+#### Using devenv (Nix Environment)
+
+If you use `devenv`, all dependencies (`go`, `ffmpeg`, `yt-dlp`, `spotdl`, `python3`) are automatically managed:
+
+```bash
+devenv shell
+go run src/main.go
+```
 
 #### Docker Compose (Recommended)
 
@@ -38,22 +44,18 @@ services:
       - "8080:8080"
     environment:
       - NAVIDROME_BASE=http://navidrome:4533
+      - METADATA_PROVIDER=aggregator
     restart: unless-stopped
     volumes:
       - /path/to/music:/music
-
 ```
 
 ### Configuration
 
-Navifetch can be configured using the following environment variables:
-It is recommended to use LastFM for metadata as it has a better search engine, also iTunes won't be able to stream directly when downloading a song it will only be able to download it and then search again to stream it.
-
-| Variable            | Description                                                   | Default |
-|---------------------|---------------------------------------------------------------|---------|
-| `NAVIDROME_BASE`    | **Required**. The base URL of your Subsonic/Navidrome server. | None    |
-| `COUNTRY`           | The country code to use for iTunes API requests.              | `US`    |
-| `METADATA_PROVIDER` | The metadata provider to use: `itunes`, `musicbrainz`, or `lastfm`. | None    |
-| `LASTFM_API_KEY`    | **Required for lastfm**. Your Last.fm API key.                 | None    |
-| `RESULTS_PER_PAGE`  | The number of results to display per page.                    | `10`    |
-
+| Variable            | Description                                                            | Default      |
+|---------------------|------------------------------------------------------------------------|--------------|
+| `NAVIDROME_BASE`    | **Required**. The base URL of your Subsonic/Navidrome server.          | None         |
+| `COUNTRY`           | The country code to use for iTunes API requests.                       | `US`         |
+| `METADATA_PROVIDER` | The metadata provider to use: `aggregator` (default), `itunes`, `musicbrainz`, or `lastfm`. | `aggregator` |
+| `LASTFM_API_KEY`    | Optional key for Last.fm provider.                                     | None         |
+| `RESULTS_PER_PAGE`  | The number of results to display per page.                             | `10`         |
