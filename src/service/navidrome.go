@@ -73,6 +73,10 @@ func (p *SubsonicReverseProxy) ServeHTTP(w http.ResponseWriter, r *http.Request)
 }
 
 func (p *SubsonicReverseProxy) SendNavidromeRequest(ctx context.Context, path, rawQuery string) ([]byte, int, string, error) {
+	return p.SendNavidromeRequestWithHeaders(ctx, path, rawQuery, nil)
+}
+
+func (p *SubsonicReverseProxy) SendNavidromeRequestWithHeaders(ctx context.Context, path, rawQuery string, reqHeaders http.Header) ([]byte, int, string, error) {
 	var urlBuilder strings.Builder
 	urlBuilder.WriteString(strings.TrimRight(p.base, "/"))
 	urlBuilder.WriteString(path)
@@ -80,8 +84,16 @@ func (p *SubsonicReverseProxy) SendNavidromeRequest(ctx context.Context, path, r
 		urlBuilder.WriteString("?")
 		urlBuilder.WriteString(rawQuery)
 	}
+	headers := make(map[string]string)
+	if reqHeaders != nil {
+		for k, v := range reqHeaders {
+			if len(v) > 0 {
+				headers[k] = v[0]
+			}
+		}
+	}
 	log.Printf("URL for Navidrome request: %s", urlBuilder.String())
-	body, status, contentType, err := util.HTTPGet(ctx, urlBuilder.String(), nil)
+	body, status, contentType, err := util.HTTPGet(ctx, urlBuilder.String(), headers)
 	if err != nil {
 		log.Printf("Navidrome request error: %v", err)
 		return nil, 0, "", err
@@ -90,6 +102,10 @@ func (p *SubsonicReverseProxy) SendNavidromeRequest(ctx context.Context, path, r
 }
 
 func (p *SubsonicReverseProxy) SearchNavidrome(ctx context.Context, path, rawQuery string) ([]model.SubsonicSong, string, error) {
+	if u, err := url.ParseQuery(rawQuery); err == nil {
+		u.Set("f", "json")
+		rawQuery = u.Encode()
+	}
 	body, _, contentType, err := p.SendNavidromeRequest(ctx, path, rawQuery)
 	if err == nil && body != nil {
 		var sr model.SubsonicSearchResponse

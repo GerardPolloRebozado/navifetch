@@ -114,8 +114,78 @@ func (h *Handler) ProxyMetadata(w http.ResponseWriter, r *http.Request) {
 	h.rp.ServeHTTP(w, r)
 }
 
+func (h *Handler) NativeApiSong(w http.ResponseWriter, r *http.Request) {
+	// Extract search query from Navidrome native REST parameters
+	query := r.URL.Query().Get("title")
+	if query == "" {
+		query = r.URL.Query().Get("q")
+	}
+	if query == "" {
+		query = r.URL.Query().Get("query")
+	}
+	if query == "" {
+		query = r.URL.Query().Get("search")
+	}
+	if query == "" {
+		query = r.URL.Query().Get("artist")
+	}
+
+	// When browsing local library without a search query, proxy directly to Navidrome
+	if query == "" || query == "\"\"" {
+		h.rp.ServeHTTP(w, r)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	defer cancel()
+
+	// 1. Send request to Navidrome with incoming client headers to fetch local matching songs
+	body, _, _, err := h.rp.SendNavidromeRequestWithHeaders(ctx, r.URL.Path, r.URL.RawQuery, r.Header)
+	var localSongs []map[string]any
+	if err == nil && body != nil {
+		_ = json.Unmarshal(body, &localSongs)
+	}
+
+	// 2. Search external metadata provider for missing tracks
+	externalSongs, err := h.metadata.SearchSongs(ctx, query)
+	if err != nil {
+		externalSongs = nil
+	}
+
+	allSongs := make([]map[string]any, 0, len(localSongs)+len(externalSongs))
+	allSongs = append(allSongs, localSongs...)
+
+	for _, s := range externalSongs {
+		extMap := map[string]any{
+			"id":          s.ID,
+			"title":       s.Title,
+			"artist":      s.Artist,
+			"artistId":    s.ArtistID,
+			"album":       s.Album,
+			"albumId":     s.AlbumID,
+			"duration":    s.Duration,
+			"genre":       s.Genre,
+			"coverArt":    s.CoverArt,
+			"hasCoverArt": true,
+			"size":        s.Size,
+			"isDir":       false,
+			"path":        s.Title + ".mp3",
+		}
+		allSongs = append(allSongs, extMap)
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Total-Count", fmt.Sprintf("%d", len(allSongs)))
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(allSongs)
+}
+
 func (h *Handler) ProxyStream(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
+	if id == "" {
+		id = strings.TrimPrefix(r.URL.Path, "/api/stream/")
+		id = strings.TrimPrefix(id, "/api/raw/")
+	}
 	permanent := strings.Contains(r.URL.Path, "download")
 
 	if strings.HasPrefix(id, "external-") {
@@ -182,6 +252,9 @@ func (h *Handler) ProxyCoverArt(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	id := r.URL.Query().Get("id")
+	if id == "" {
+		id = strings.TrimPrefix(r.URL.Path, "/api/coverArt/")
+	}
 	size := r.URL.Query().Get("size")
 
 	if size == "" {

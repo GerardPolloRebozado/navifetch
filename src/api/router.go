@@ -33,6 +33,18 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("/rest/savePlayQueue.view", h.ProxyPlaylist)
 	mux.HandleFunc("/rest/savePlayQueue", h.ProxyPlaylist)
 
+	// Navidrome native API routes (used by Feishin and modern clients)
+	mux.HandleFunc("/api/song", h.NativeApiSong)
+	mux.HandleFunc("/api/song/", h.NativeApiSong)
+
+	mux.HandleFunc("/api/coverArt", h.ProxyCoverArt)
+	mux.HandleFunc("/api/coverArt/", h.ProxyCoverArt)
+
+	mux.HandleFunc("/api/stream", h.ProxyStream)
+	mux.HandleFunc("/api/stream/", h.ProxyStream)
+	mux.HandleFunc("/api/raw", h.ProxyStream)
+	mux.HandleFunc("/api/raw/", h.ProxyStream)
+
 	// Catch-all reverse proxy
 	mux.HandleFunc("/", h.CatchAll)
 }
