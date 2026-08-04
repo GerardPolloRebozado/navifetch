@@ -5,20 +5,12 @@ Navifetch is a specialized proxy for Subsonic-compatible music servers (such as 
 
 ### How It Works
 
-When a client makes a search request, Navifetch forwards the query to your Subsonic server. If the requested content is not found in your local library, Navifetch automatically searches the iTunes API. 
 
-If you choose to play a song found via iTunes, Navifetch downloads it using `yt-dlp` and streams it to your client. 
-- **Temporary Streaming**: Files downloaded for streaming are automatically deleted after 24 hours.
-- **Persistent Downloads**: If you add a track to a playlist, it is downloaded.
+When a client makes a search request, Navifetch forwards the query to your Navidrome server. If the requested content is not found in your local library, Navifetch automatically searches the son with iTunes API and yt-dlp and returns the list of songs available externally, if the user plays one of that songs the song will be downloaded using yt-dlp and played, you can also add it to a playlist. After 24hrs if the song was only played but not added to a playlist the song will be removed to keep the files clean.
 
 ### Disclaimer
 
 This tool is intended for use with authorized content only. The developer is not responsible for copyright infringement or any damage resulting from the use of this software.
-
-### Features
-
-- Seamless integration with Subsonic-compatible clients.
-- Dynamic on-demand downloading and streaming.
 
 ### Installation & Development
 
@@ -44,10 +36,12 @@ services:
       - "8080:8080"
     environment:
       - NAVIDROME_BASE=http://navidrome:4533
+      - NAVIDROME_DB_PATH=/navidrome-data/navidrome.db
       - METADATA_PROVIDER=aggregator
     restart: unless-stopped
     volumes:
       - /path/to/music:/music
+      - /path/to/navidrome_data:/navidrome-data:ro
 ```
 
 ### Configuration
@@ -55,7 +49,7 @@ services:
 | Variable            | Description                                                            | Default      |
 |---------------------|------------------------------------------------------------------------|--------------|
 | `NAVIDROME_BASE`    | **Required**. The base URL of your Subsonic/Navidrome server.          | None         |
+| `NAVIDROME_DB_PATH` | Path to `navidrome.db` for instant & exact path-based song ID resolution after downloads. Mount Navidrome's data folder read-only (`:ro`). | None |
 | `COUNTRY`           | The country code to use for iTunes API requests.                       | `US`         |
-| `METADATA_PROVIDER` | The metadata provider to use: `aggregator` (default), `itunes`, `musicbrainz`, or `lastfm`. | `aggregator` |
-| `LASTFM_API_KEY`    | Optional key for Last.fm provider.                                     | None         |
+| `METADATA_PROVIDER` | The metadata provider to use: `aggregator` (default), `itunes`, or `musicbrainz`. | `aggregator` |
 | `RESULTS_PER_PAGE`  | The number of results to display per page.                             | `10`         |

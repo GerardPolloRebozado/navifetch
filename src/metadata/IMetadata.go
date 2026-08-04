@@ -18,7 +18,7 @@ type Provider interface {
 
 var metadataProvider Provider
 
-func NewProvider(name string, country string, limit int, apiKey string) (Provider, error) {
+func NewProvider(name string, country string, limit int) (Provider, error) {
 	if metadataProvider != nil {
 		return metadataProvider, nil
 	}
@@ -28,9 +28,6 @@ func NewProvider(name string, country string, limit int, apiKey string) (Provide
 		return metadataProvider, nil
 	case "musicbrainz":
 		metadataProvider = NewMusicBrainzProvider(limit)
-		return metadataProvider, nil
-	case "lastfm":
-		metadataProvider = NewLastFMProvider(apiKey, limit)
 		return metadataProvider, nil
 	case "aggregator", "":
 		metadataProvider = NewAggregatorProvider(country, limit)

@@ -1,11 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,7 +29,7 @@ type Handler struct {
 }
 
 func NewHandler(cfg *config.Config, rp *service.SubsonicReverseProxy) *Handler {
-	p, err := metadata.NewProvider(cfg.MetadataProvider, cfg.Country, cfg.Limit, cfg.LastFMApiKey)
+	p, err := metadata.NewProvider(cfg.MetadataProvider, cfg.Country, cfg.Limit)
 	if err != nil {
 		log.Fatalf("Failed to initialize metadata provider: %v", err)
 	}
@@ -115,6 +118,8 @@ func (h *Handler) ProxyMetadata(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) NativeApiSong(w http.ResponseWriter, r *http.Request) {
+	h.TranslateExternalIDs(r)
+
 	// Extract search query from Navidrome native REST parameters
 	query := r.URL.Query().Get("title")
 	if query == "" {
@@ -130,7 +135,7 @@ func (h *Handler) NativeApiSong(w http.ResponseWriter, r *http.Request) {
 		query = r.URL.Query().Get("artist")
 	}
 
-	// When browsing local library without a search query, proxy directly to Navidrome
+	// When browsing local library or querying a specific song ID without a search query, proxy directly to Navidrome
 	if query == "" || query == "\"\"" {
 		h.rp.ServeHTTP(w, r)
 		return
@@ -181,71 +186,127 @@ func (h *Handler) NativeApiSong(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ProxyStream(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		id = strings.TrimPrefix(r.URL.Path, "/api/stream/")
-		id = strings.TrimPrefix(id, "/api/raw/")
-	}
-	permanent := strings.Contains(r.URL.Path, "download")
-
-	if strings.HasPrefix(id, "external-") {
-		trackID := strings.TrimPrefix(id, "external-")
-		_, targetPath, err := h.streamService.DownloadTrack(trackID, permanent)
-		if err != nil {
-			http.Error(w, "Failed to prepare track for streaming", http.StatusInternalServerError)
-			return
-		}
-
-		// Trigger background scan asynchronously so Navidrome indexes the track without delaying playback
-		go h.rp.SendNavidromeRequest(context.Background(), "/rest/startScan.view", r.URL.RawQuery)
-
-		log.Printf("Directly streaming track for %s from file: %s", trackID, targetPath)
-		http.ServeFile(w, r, targetPath)
-		return
-	}
+	h.TranslateExternalIDs(r)
 	h.rp.ServeHTTP(w, r)
 }
 
 func (h *Handler) ProxyPlaylist(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("songIdToAdd")
+	h.TranslateExternalIDs(r)
+	h.rp.ServeHTTP(w, r)
+}
 
-	if strings.HasPrefix(id, "external-") {
-		id = strings.TrimPrefix(id, "external-")
+func (h *Handler) ProxyIDTranslation(w http.ResponseWriter, r *http.Request) {
+	h.TranslateExternalIDs(r)
+	h.rp.ServeHTTP(w, r)
+}
 
-		songMetadata, _, err := h.streamService.DownloadTrack(id, true)
-		if err != nil {
-			http.Error(w, "Failed to prepare track for streaming", http.StatusInternalServerError)
-			return
+// TranslateExternalIDs transparently intercepts any query params, path params, or JSON body containing 'external-' IDs,
+// ensures the track is downloaded, resolves its real Navidrome song ID, and rewrites the request before proxying.
+func (h *Handler) TranslateExternalIDs(r *http.Request) {
+	// 1. Process Query Parameters (e.g. id, mediaId, songId, songIdToAdd)
+	q := r.URL.Query()
+	modifiedQuery := false
+
+	for key, values := range q {
+		newValues := make([]string, len(values))
+		for i, val := range values {
+			if strings.HasPrefix(val, "external-") {
+				cleanID := strings.TrimPrefix(val, "external-")
+				songMetadata, targetPath, err := h.streamService.DownloadTrack(cleanID, true)
+				if err == nil {
+					title := strings.TrimSuffix(songMetadata.Title, " (external)")
+					artist := songMetadata.Artist
+					mbid := songMetadata.MusicBrainzId
+					if mbid == "" {
+						mbid = cleanID
+					}
+					relativePath := strings.TrimPrefix(targetPath, h.cfg.MusicLibraryPath+"/")
+					foundSong, err := h.rp.FindNavidromeSongID(h.cfg, relativePath, artist, title, mbid, r)
+					if err == nil {
+						newValues[i] = foundSong.ID
+						modifiedQuery = true
+						continue
+					}
+				}
+			}
+			newValues[i] = val
 		}
-		subsonicUser := r.URL.Query().Get("u")
-		subsonicPass := r.URL.Query().Get("p")
-		if subsonicUser == "" && subsonicPass == "" {
-			http.Error(w, "Failed to get auth parameters", http.StatusInternalServerError)
-			return
-		}
+		q[key] = newValues
+	}
 
-		title := strings.TrimSuffix(songMetadata.Title, " (external)")
-		artist := songMetadata.Artist
-		mbid := songMetadata.MusicBrainzId
-		if mbid == "" {
-			mbid = id
-			if strings.HasPrefix(mbid, "external-") {
-				mbid = strings.TrimPrefix(mbid, "external-")
+	if modifiedQuery {
+		r.URL.RawQuery = q.Encode()
+	}
+
+	// Process Path Parameters (e.g. /api/song/external-1839202495)
+	if strings.Contains(r.URL.Path, "external-") {
+		extIDRegex := regexp.MustCompile(`external-[a-zA-Z0-9_\-]+`)
+		matches := extIDRegex.FindAllString(r.URL.Path, -1)
+		for _, extID := range matches {
+			cleanID := strings.TrimPrefix(extID, "external-")
+			songMetadata, targetPath, err := h.streamService.DownloadTrack(cleanID, true)
+			if err == nil {
+				title := strings.TrimSuffix(songMetadata.Title, " (external)")
+				artist := songMetadata.Artist
+				mbid := songMetadata.MusicBrainzId
+				if mbid == "" {
+					mbid = cleanID
+				}
+				relativePath := strings.TrimPrefix(targetPath, h.cfg.MusicLibraryPath+"/")
+				foundSong, err := h.rp.FindNavidromeSongID(h.cfg, relativePath, artist, title, mbid, r)
+				if err == nil {
+					r.URL.Path = strings.Replace(r.URL.Path, extID, foundSong.ID, 1)
+				}
 			}
 		}
-
-		foundSong, err := h.rp.FindNavidromeSongID(artist, title, mbid, r)
-		if err != nil {
-			http.Error(w, "Failed to find song in Navidrome", http.StatusInternalServerError)
-			return
-		}
-		q := r.URL.Query()
-		q.Set("songIdToAdd", foundSong.ID)
-		r.URL.RawQuery = q.Encode()
-		h.rp.ServeHTTP(w, r)
-		return
 	}
-	h.rp.ServeHTTP(w, r)
+
+	// Process Request Body (JSON or Form POST/PUT/PATCH)
+	if r.Body != nil && (r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err == nil && len(bodyBytes) > 0 {
+			bodyStr := string(bodyBytes)
+			if strings.Contains(bodyStr, "external-") {
+				extIDRegex := regexp.MustCompile(`external-[a-zA-Z0-9_\-]+`)
+				matches := extIDRegex.FindAllString(bodyStr, -1)
+
+				uniqueIDs := make(map[string]bool)
+				for _, match := range matches {
+					uniqueIDs[match] = true
+				}
+
+				replacements := make(map[string]string)
+				for extID := range uniqueIDs {
+					cleanID := strings.TrimPrefix(extID, "external-")
+					songMetadata, targetPath, err := h.streamService.DownloadTrack(cleanID, true)
+					if err == nil {
+						title := strings.TrimSuffix(songMetadata.Title, " (external)")
+						artist := songMetadata.Artist
+						mbid := songMetadata.MusicBrainzId
+						if mbid == "" {
+							mbid = cleanID
+						}
+						relativePath := strings.TrimPrefix(targetPath, h.cfg.MusicLibraryPath+"/")
+						foundSong, err := h.rp.FindNavidromeSongID(h.cfg, relativePath, artist, title, mbid, r)
+						if err == nil {
+							replacements[extID] = foundSong.ID
+						}
+					}
+				}
+
+				for extID, newID := range replacements {
+					bodyStr = strings.ReplaceAll(bodyStr, extID, newID)
+				}
+
+				newBodyBytes := []byte(bodyStr)
+				r.Body = io.NopCloser(bytes.NewReader(newBodyBytes))
+				r.ContentLength = int64(len(newBodyBytes))
+				r.Header.Set("Content-Length", strconv.Itoa(len(newBodyBytes)))
+			} else {
+				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			}
+		}
+	}
 }
 
 func (h *Handler) ProxyCoverArt(w http.ResponseWriter, r *http.Request) {

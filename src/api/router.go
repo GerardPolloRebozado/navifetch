@@ -45,6 +45,22 @@ func RegisterRoutes(mux *http.ServeMux, h *Handler) {
 	mux.HandleFunc("/api/raw", h.ProxyStream)
 	mux.HandleFunc("/api/raw/", h.ProxyStream)
 
+	mux.HandleFunc("/api/playlist", h.ProxyPlaylist)
+	mux.HandleFunc("/api/playlist/", h.ProxyPlaylist)
+	mux.HandleFunc("/api/playlists", h.ProxyPlaylist)
+	mux.HandleFunc("/api/playlists/", h.ProxyPlaylist)
+
+	mux.HandleFunc("/rest/reportPlayback.view", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/reportPlayback", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/scrobble.view", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/scrobble", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/star.view", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/star", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/unstar.view", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/unstar", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/setRating.view", h.ProxyIDTranslation)
+	mux.HandleFunc("/rest/setRating", h.ProxyIDTranslation)
+
 	// Catch-all reverse proxy
 	mux.HandleFunc("/", h.CatchAll)
 }

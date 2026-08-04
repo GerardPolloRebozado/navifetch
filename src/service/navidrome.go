@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GerardPolloRebozado/navifetch/src/config"
 	"github.com/GerardPolloRebozado/navifetch/src/model"
 	"github.com/GerardPolloRebozado/navifetch/src/util"
+	_ "modernc.org/sqlite"
 )
 
 type SubsonicReverseProxy struct {
@@ -124,56 +127,119 @@ func (p *SubsonicReverseProxy) SearchNavidrome(ctx context.Context, path, rawQue
 	return nil, "", err
 }
 
-func (p *SubsonicReverseProxy) FindNavidromeSongID(artist string, title string, mbid string, r *http.Request) (*model.SubsonicSong, error) {
-	var foundSong *model.SubsonicSong
-	query := fmt.Sprintf("%s %s", artist, title)
+// WaitForScanComplete polls getScanStatus until the scan finishes or the context expires
+func (p *SubsonicReverseProxy) WaitForScanComplete(ctx context.Context, rawQuery string) error {
+	for {
+		body, _, _, err := p.SendNavidromeRequest(ctx, "/rest/getScanStatus.view", rawQuery+"&f=json")
+		if err == nil {
+			var status struct {
+				Subsonic struct {
+					ScanStatus struct {
+						Scanning bool `json:"scanning"`
+						Count    int  `json:"count"`
+					} `json:"scanStatus"`
+				} `json:"subsonic-response"`
+			}
+			if json.Unmarshal(body, &status) == nil && !status.Subsonic.ScanStatus.Scanning {
+				return nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
 
-	// Use background context with timeout for Navidrome searches to avoid cancellation if a client disconnects
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+// findSongByPathInDB queries Navidrome's SQLite database directly to find a song by its file path
+func findSongByPathInDB(dbPath, relativePath string) (*model.SubsonicSong, error) {
+	db, err := sql.Open("sqlite", dbPath+"?mode=ro")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open Navidrome DB: %w", err)
+	}
+	defer db.Close()
+
+	var song model.SubsonicSong
+	err = db.QueryRow(
+		"SELECT id, title, artist, album, COALESCE(mbz_recording_id, '') FROM media_file WHERE path = ?",
+		relativePath,
+	).Scan(&song.ID, &song.Title, &song.Artist, &song.Album, &song.MusicBrainzId)
+	if err != nil {
+		return nil, fmt.Errorf("song not found at path %s: %w", relativePath, err)
+	}
+	return &song, nil
+}
+
+// FindNavidromeSongID resolves a downloaded song's Navidrome ID:
+// If Subsonic auth is present, trigger rescan via Subsonic API
+// Poll direct SQLite DB lookup by file path
+// Fallback: name-based search via search3 API
+func (p *SubsonicReverseProxy) FindNavidromeSongID(cfg *config.Config, filePath string, artist string, title string, mbid string, r *http.Request) (*model.SubsonicSong, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	hasSubsonicAuth := r.URL.Query().Get("u") != ""
+
+	if hasSubsonicAuth {
+		log.Printf("Triggering Navidrome scan for new file: %s", filePath)
+		go p.SendNavidromeRequest(context.Background(), "/rest/startScan.view", r.URL.RawQuery)
+	}
+
+	// DB lookup by path
+	if cfg.NavidromeDBPath != "" && filePath != "" {
+		log.Printf("Polling Navidrome DB for path: %s", filePath)
+		ticker := time.NewTicker(500 * time.Millisecond)
+		defer ticker.Stop()
+
+		for i := 0; i < 30; i++ {
+			song, err := findSongByPathInDB(cfg.NavidromeDBPath, filePath)
+			if err == nil {
+				log.Printf("Found song by DB path lookup: %s - %s (ID: %s)", song.Artist, song.Title, song.ID)
+				return song, nil
+			}
+
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-ticker.C:
+			}
+		}
+		log.Printf("DB path lookup timed out after 15s for: %s", filePath)
+	}
+
+	if !hasSubsonicAuth {
+		return nil, fmt.Errorf("song not found in Navidrome DB after download: %s - %s", artist, title)
+	}
+
+	query := fmt.Sprintf("%s %s", artist, title)
 	searchParams := r.URL.Query()
 	searchParams.Set("query", query)
 	searchRawQuery := searchParams.Encode()
 
-	log.Printf("Searching Navidrome for exact match: %s (MBID: %s)", query, mbid)
+	log.Printf("Searching Navidrome via search3 fallback for: %s (MBID: %s)", query, mbid)
 
-	for i := 0; i < 15; i++ {
+	for i := 0; i < 5; i++ {
 		searchResult, _, err := p.SearchNavidrome(ctx, "/rest/search3.view", searchRawQuery)
 		if err == nil {
 			for _, song := range searchResult {
-				// 1. Try match by MBID if available
 				if mbid != "" && song.MusicBrainzId == mbid {
-					log.Printf("Found exact match in Navidrome by MBID: %s (ID: %s)", song.Title, song.ID)
-					foundSong = &song
-					break
+					log.Printf("Found match by MBID: %s (ID: %s)", song.Title, song.ID)
+					return &song, nil
 				}
-				// 2. Try match by Artist and Title as fallback
 				if strings.EqualFold(song.Artist, artist) && strings.EqualFold(song.Title, title) {
-					log.Printf("Found match in Navidrome by Artist/Title: %s - %s (ID: %s)", song.Artist, song.Title, song.ID)
-					foundSong = &song
-					break
+					log.Printf("Found match by Artist/Title: %s - %s (ID: %s)", song.Artist, song.Title, song.ID)
+					return &song, nil
 				}
 			}
 		}
 
-		if foundSong != nil {
-			return foundSong, nil
-		}
-
-		if i < 14 {
-			log.Printf("Match not found yet, retrying in 2s... (attempt %d/15)", i+1)
+		if i < 4 {
+			log.Printf("Match not found yet, retrying in 2s... (attempt %d/5)", i+1)
 			time.Sleep(2 * time.Second)
-			// Re-trigger scan
 			go p.SendNavidromeRequest(context.Background(), "/rest/startScan.view", r.URL.RawQuery)
 		}
 	}
 
-	log.Printf("Failed to find exact match, falling back to first search result for: %s", title)
-	searchResult, _, err := p.SearchNavidrome(ctx, "/rest/search3.view", searchRawQuery)
-	if err == nil && len(searchResult) > 0 {
-		return &searchResult[0], nil
-	}
-
-	return nil, fmt.Errorf("song not found in Navidrome after download")
+	return nil, fmt.Errorf("song not found in Navidrome after download: %s - %s", artist, title)
 }

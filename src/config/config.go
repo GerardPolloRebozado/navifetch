@@ -12,11 +12,11 @@ type Config struct {
 	NavidromeBase    string
 	Port             string
 	MusicLibraryPath string
+	NavidromeDBPath  string
 	YTDLPPath        string
 	MetadataProvider string
 	Country          string
 	Limit            int
-	LastFMApiKey     string
 }
 
 func LoadConfig() (*Config, error) {
@@ -41,11 +41,11 @@ func LoadConfig() (*Config, error) {
 		NavidromeBase:    base,
 		Port:             getEnv("PORT", "8080"),
 		MusicLibraryPath: libPath,
+		NavidromeDBPath:  getEnv("NAVIDROME_DB_PATH", ""),
 		YTDLPPath:        getEnv("YTDLP_PATH", "yt-dlp"),
 		MetadataProvider: getEnv("METADATA_PROVIDER", "aggregator"),
 		Country:          getEnv("COUNTRY", "US"),
 		Limit:            limit,
-		LastFMApiKey:     getEnv("LASTFM_API_KEY", ""),
 	}, nil
 }
 

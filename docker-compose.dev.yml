@@ -24,11 +24,13 @@ services:
       - "8080:8080"
     environment:
       NAVIDROME_BASE: http://navidrome:4533
+      NAVIDROME_DB_PATH: /navidrome-data/navidrome.db
       METADATA_PROVIDER: aggregator
       COUNTRY: US
       RESULTS_PER_PAGE: 10
     volumes:
       - ./dev_data/music:/music
+      - ./dev_data/navidrome:/navidrome-data:ro
     depends_on:
       - navidrome
     restart: unless-stopped
